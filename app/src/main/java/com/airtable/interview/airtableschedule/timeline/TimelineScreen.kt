@@ -17,11 +17,12 @@ import com.airtable.interview.airtableschedule.models.Event
  */
 @Composable
 fun TimelineScreen(
-    viewModel: TimelineViewModel = viewModel()
+    viewModel: TimelineViewModel = viewModel(),
+    modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    TimelineView(uiState.events)
+    TimelineView(uiState.events, modifier)
 }
 
 /**
@@ -33,8 +34,9 @@ fun TimelineScreen(
 @Composable
 private fun TimelineView(
     events: List<Event>,
+    modifier: Modifier = Modifier
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
         events.forEach {
             EventView(event = it)
         }
