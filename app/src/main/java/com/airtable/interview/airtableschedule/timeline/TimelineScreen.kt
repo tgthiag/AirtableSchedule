@@ -33,6 +33,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
+// ▼ added imports for popup + click
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+
 // Screen that shows all events in a timeline
 @Composable
 fun TimelineScreen(
@@ -85,6 +91,9 @@ private fun TimelineView(
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
 
+    // ▼ keep selected event for popup
+    var selectedEvent by remember { mutableStateOf<Event?>(null) }
+
     Column(modifier = modifier.fillMaxSize().verticalScroll(vScroll)                            // ← vertical scroll
         .padding(bottom = 12.dp)) {
         ZoomBar(value = pxPerDay, onChange = onChangePxPerDay)  // ← zoom control
@@ -99,11 +108,33 @@ private fun TimelineView(
         ) {
             lanes.forEach { lane ->
                 LaneRow(
-                    events = lane, scale = scale, scrollState = hScroll
+                    events = lane,
+                    scale = scale,
+                    scrollState = hScroll,
+                    // ▼ open dialog for clicked event
+                    onEventClick = { selectedEvent = it }
                 )
             }
         }
         Spacer(Modifier.height(16.dp))
+    }
+
+    // ▼ details popup
+    selectedEvent?.let { ev ->
+        val df = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+        AlertDialog(
+            onDismissRequest = { selectedEvent = null },
+            title = { Text(ev.name) },
+            text = {
+                Text(
+                    "${df.format(ev.startDate)} — ${df.format(ev.endDate)}\n" +
+                            "Duration: ${durationDays(ev)} day(s)"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedEvent = null }) { Text("OK") }
+            }
+        )
     }
 }
 
@@ -130,7 +161,7 @@ private fun TimelineHeader(
             .horizontalScroll(scrollState)
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .requiredWidth(totalWidthDp.coerceAtMost(12000.dp)),
-                horizontalArrangement = Arrangement.spacedBy(0.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         var dayIndex = 0
@@ -178,7 +209,9 @@ private fun TimelineHeader(
 // One lane: events are placed with spacing based on date
 @Composable
 private fun LaneRow(
-    events: List<Event>, scale: TimeScale, scrollState: androidx.compose.foundation.ScrollState
+    events: List<Event>, scale: TimeScale, scrollState: androidx.compose.foundation.ScrollState,
+    // ▼ click callback
+    onEventClick: (Event) -> Unit
 ) {
     // Total width for all days
     val totalWidthDp = (scale.totalDays * scale.pxPerDay).dp
@@ -190,7 +223,7 @@ private fun LaneRow(
             .padding(horizontal = 12.dp)
             .height(40.dp)
             .requiredWidth(totalWidthDp.coerceAtMost(12000.dp)),
-                verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         var lastRightEdgeDays = 0
 
@@ -204,7 +237,10 @@ private fun LaneRow(
             }
 
             EventChip(
-                event = event, widthDp = (duration * scale.pxPerDay).dp
+                event = event,
+                widthDp = (duration * scale.pxPerDay).dp,
+                // ▼ propagate click
+                onClick = { onEventClick(event) }
             )
 
             lastRightEdgeDays = offsetDays + duration
@@ -217,7 +253,9 @@ private fun LaneRow(
 // Minimal visual for an event
 @Composable
 private fun EventChip(
-    event: Event, widthDp: Dp
+    event: Event, widthDp: Dp,
+    // ▼ click handler
+    onClick: () -> Unit
 ) {
     val chipWidth = if (widthDp < 12.dp) 12.dp else widthDp
     Surface(
@@ -229,6 +267,7 @@ private fun EventChip(
             .width(chipWidth)
             .height(36.dp)
             .clip(MaterialTheme.shapes.small)
+            .clickable { onClick() } // ▼ open popup
     ) {
         Box(
             Modifier
@@ -267,7 +306,7 @@ private fun ZoomBar(value: Float, onChange: (Float) -> Unit) {
         Slider(
             value = value,
             onValueChange = onChange,
-            valueRange = 6f..80f   // zoom out … zoom in
+            valueRange = 6f..20f   // zoom out … zoom in
         )
     }
 }
