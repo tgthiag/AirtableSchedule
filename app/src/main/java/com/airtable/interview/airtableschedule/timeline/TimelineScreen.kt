@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.airtable.interview.airtableschedule.models.Event
@@ -28,11 +30,13 @@ import java.util.Locale
 // Screen that shows all events in a timeline
 @Composable
 fun TimelineScreen(
-    viewModel: TimelineViewModel = viewModel(), modifier: Modifier = Modifier
+    dataset: String = "Sample", modifier: Modifier = Modifier
 ) {
-    // collect state from the view model
+    val viewModel: TimelineViewModel = viewModel(
+        key = dataset,
+        factory = TimelineViewModelFactory(dataset) // need a factory
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    // show the timeline view with the events
     TimelineView(uiState.events, modifier)
 }
 
@@ -205,5 +209,16 @@ private fun EventChip(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+class TimelineViewModelFactory(
+    private val dataset: String
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TimelineViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TimelineViewModel(dataset) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

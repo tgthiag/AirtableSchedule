@@ -12,11 +12,11 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * ViewModel responsible for managing the state of the timeline screen.
  */
-class TimelineViewModel: ViewModel() {
+class TimelineViewModel(private val dataset: String = "Sample"): ViewModel() {
     private val eventDataRepository: EventDataRepository = EventDataRepositoryImpl()
 
     val uiState: StateFlow<TimelineUiState> = eventDataRepository
-        .getTimelineItems()
+        .getTimelineItems(dataset)
         .map(::TimelineUiState)
         .stateIn(
             viewModelScope,
