@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.airtable.interview.airtableschedule.models.Event
 import com.airtable.interview.airtableschedule.models.assignLanes
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 // Screen that shows all events in a timeline
 @Composable
@@ -79,29 +82,55 @@ private fun TimelineHeader(
 ) {
     // total width in dp = totalDays * pxPerDay
     val totalWidthDp = (scale.totalDays * scale.pxPerDay).dp
+    // date formatter (e.g. "Feb 1")
+    val dayFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+    val headerHeight = 32.dp
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(scrollState)
+            .horizontalScroll(scrollState) // allow horizontal scroll
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .widthIn(min = totalWidthDp),
+            .widthIn(min = totalWidthDp), // make sure width matches total days
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        repeat(scale.totalDays) { dayIndex ->
+        repeat(scale.totalDays) { index ->
+            val date = dateAtOffset(scale.minDate, index)
+            // check if this is the first day of a month
+            val isMonthStart = date.date == 1 // legacy Date API, for test
             Box(
                 modifier = Modifier
                     .width(scale.pxPerDay.dp)
-                    .height(40.dp),
+                    .height(headerHeight),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                // show label only every 5 days
-                if (dayIndex % 5 == 0) {
-                    Text(
-                        text = dayIndex.toString(), style = MaterialTheme.typography.labelSmall
-                    )
+                // show label every 7 days and at first day of month
+                if (isMonthStart || index % 7 == 0) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = SimpleDateFormat("MMM", Locale.getDefault()).format(date),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        Text(
+                            text = SimpleDateFormat("d", Locale.getDefault()).format(date),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
+            }
+            // thin vertical line as a month separator (after day 1)
+            if (isMonthStart && index != 0) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(headerHeight)
+                        .padding(vertical = 4.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
             }
         }
     }

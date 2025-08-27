@@ -76,3 +76,9 @@ private fun floorDiv(x: Long, y: Long): Long {
     val r = x % y
     return if (r != 0L && ((x xor y) < 0)) q - 1 else q
 }
+
+private const val MS_PER_DAY = 24L * 60 * 60 * 1000
+
+fun dateAtOffset(start: Date, offsetDays: Int): Date {
+    return Date(start.time + offsetDays * MS_PER_DAY)
+}
