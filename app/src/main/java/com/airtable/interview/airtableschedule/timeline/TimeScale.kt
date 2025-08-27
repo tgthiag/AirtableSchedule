@@ -15,7 +15,7 @@ data class TimeScale(
     val minDate: Date, val maxDate: Date, val pxPerDay: Float = DEFAULT_PX_PER_DAY
 ) {
     companion object {
-        const val DEFAULT_PX_PER_DAY = 12f
+        const val DEFAULT_PX_PER_DAY = 24f
     }
 
     // Total days spanned by the entire dataset.

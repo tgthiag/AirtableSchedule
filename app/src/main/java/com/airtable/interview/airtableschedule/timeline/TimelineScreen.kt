@@ -50,7 +50,7 @@ private fun TimelineView(
     }
 
     val lanes = assignLanes(events) //organize events into lanes (no overlap in the same lane)
-    val scale = buildTimeScale(events) //create a time scale (days -> pixels) default pxPerDay = 12
+    val scale = buildTimeScale(events) //create a time scale (days -> pixels) default pxPerDay = 24
     val scroll = rememberScrollState()  // scroll state to move horizontally
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -93,8 +93,8 @@ private fun TimelineHeader(
             Box(
                 modifier = Modifier
                     .width(scale.pxPerDay.dp)
-                    .height(28.dp),
-                contentAlignment = Alignment.Center
+                    .height(40.dp),
+                contentAlignment = Alignment.BottomCenter
             ) {
                 // show label only every 5 days
                 if (dayIndex % 5 == 0) {
