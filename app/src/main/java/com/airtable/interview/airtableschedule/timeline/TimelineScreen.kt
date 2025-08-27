@@ -99,6 +99,17 @@ private fun TimelineHeader(
             val date = dateAtOffset(scale.minDate, index)
             // check if this is the first day of a month
             val isMonthStart = date.date == 1 // legacy Date API, for test
+
+            // draw vertical line BEFORE the label if it's the start of a month
+            if (isMonthStart) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(headerHeight)
+                        .padding(vertical = 4.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+            }
             Box(
                 modifier = Modifier
                     .width(scale.pxPerDay.dp)
@@ -121,16 +132,6 @@ private fun TimelineHeader(
                         )
                     }
                 }
-            }
-            // thin vertical line as a month separator (after day 1)
-            if (isMonthStart && index != 0) {
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(headerHeight)
-                        .padding(vertical = 4.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
-                )
             }
         }
     }
