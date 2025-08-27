@@ -26,6 +26,12 @@ import com.airtable.interview.airtableschedule.models.Event
 import com.airtable.interview.airtableschedule.models.assignLanes
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 
 // Screen that shows all events in a timeline
 @Composable
@@ -37,13 +43,30 @@ fun TimelineScreen(
         factory = TimelineViewModelFactory(dataset) // need a factory
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    TimelineView(uiState.events, modifier)
+    // zoom: pixels per day (remember across recompositions & dataset switches)
+    var pxPerDay by rememberSaveable(dataset) { mutableFloatStateOf(TimeScale.DEFAULT_PX_PER_DAY) }
+    LaunchedEffect(dataset, uiState.events) {
+        val events = uiState.events
+        if (events.isNotEmpty()) {
+            val (minD, maxD) = computeBounds(events)
+            val days = inclusiveDaysBetween(minD, maxD)
+            // target max total width ≈ 12_000 dp. Clamp zoom to [6..80].
+            val targetPxPerDay = (12_000f / days).coerceIn(6f, 20f)
+            pxPerDay = targetPxPerDay
+        }
+    }
+    TimelineView(
+        events = uiState.events,
+        pxPerDay = pxPerDay,
+        onChangePxPerDay = { pxPerDay = it },
+        modifier = modifier
+    )
 }
 
 // Timeline with swimlanes and a header with days
 @Composable
 private fun TimelineView(
-    events: List<Event>, modifier: Modifier = Modifier
+    events: List<Event>, pxPerDay: Float,onChangePxPerDay: (Float) -> Unit, modifier: Modifier = Modifier
 ) {
     // if no events, show a simple text
     if (events.isEmpty()) {
@@ -58,21 +81,25 @@ private fun TimelineView(
     }
 
     val lanes = assignLanes(events) //organize events into lanes (no overlap in the same lane)
-    val scale = buildTimeScale(events) //create a time scale (days -> pixels) default pxPerDay = 24
-    val scroll = rememberScrollState()  // scroll state to move horizontally
+    val scale = buildTimeScale(events, pxPerDay = pxPerDay) //create a time scale (days -> pixels) default pxPerDay = 24
+    val hScroll = rememberScrollState()
+    val vScroll = rememberScrollState()
 
-    Column(modifier = modifier.fillMaxSize()) {
-        TimelineHeader(scale = scale, scrollState = scroll) // top header with days
+    Column(modifier = modifier.fillMaxSize().verticalScroll(vScroll)                            // ← vertical scroll
+        .padding(bottom = 12.dp)) {
+        ZoomBar(value = pxPerDay, onChange = onChangePxPerDay)  // ← zoom control
+        TimelineHeader(scale = scale, scrollState = hScroll) // top header with days
         HorizontalDivider(thickness = 1.dp)
         Spacer(Modifier.height(8.dp))
 
         // Render each lane
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             lanes.forEach { lane ->
                 LaneRow(
-                    events = lane, scale = scale, scrollState = scroll
+                    events = lane, scale = scale, scrollState = hScroll
                 )
             }
         }
@@ -85,27 +112,32 @@ private fun TimelineView(
 private fun TimelineHeader(
     scale: TimeScale, scrollState: androidx.compose.foundation.ScrollState
 ) {
-    // total width in dp = totalDays * pxPerDay
     val totalWidthDp = (scale.totalDays * scale.pxPerDay).dp
-    // date formatter (e.g. "Feb 1")
-    val dayFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
     val headerHeight = 32.dp
+
+    // choose step size (how many days each "tick box" spans)
+    val stepDays = when {
+        scale.pxPerDay >= 48f -> 1   // daily
+        scale.pxPerDay >= 24f -> 3   // every 3 days
+        scale.pxPerDay >= 16f -> 7   // weekly
+        scale.totalDays > 5000 -> 30 // monthly for very long spans
+        else -> 14                   // biweekly
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(scrollState) // allow horizontal scroll
+            .horizontalScroll(scrollState)
             .padding(horizontal = 12.dp, vertical = 8.dp)
-            .widthIn(min = totalWidthDp), // make sure width matches total days
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
+            .requiredWidth(totalWidthDp.coerceAtMost(12000.dp)),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        repeat(scale.totalDays) { index ->
-            val date = dateAtOffset(scale.minDate, index)
-            // check if this is the first day of a month
-            val isMonthStart = date.date == 1 // legacy Date API, for test
+        var dayIndex = 0
+        while (dayIndex < scale.totalDays) {
+            val date = dateAtOffset(scale.minDate, dayIndex)
+            val isMonthStart = date.date == 1
 
-            // draw vertical line BEFORE the label if it's the start of a month
             if (isMonthStart) {
                 Box(
                     modifier = Modifier
@@ -115,32 +147,33 @@ private fun TimelineHeader(
                         .background(MaterialTheme.colorScheme.outlineVariant)
                 )
             }
+
             Box(
                 modifier = Modifier
-                    .width(scale.pxPerDay.dp)
+                    .width((stepDays * scale.pxPerDay).dp)
                     .height(headerHeight),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                // show label every 7 days and at first day of month
-                if (isMonthStart || index % 7 == 0) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
+                // Label at each step; content is lighter when zoomed out
+                val showDay = stepDays <= 7
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = java.text.SimpleDateFormat("MMM", Locale.getDefault()).format(date),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    if (showDay) {
                         Text(
-                            text = SimpleDateFormat("MMM", Locale.getDefault()).format(date),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                        Text(
-                            text = SimpleDateFormat("d", Locale.getDefault()).format(date),
+                            text = java.text.SimpleDateFormat("d", Locale.getDefault()).format(date),
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
                 }
             }
+            dayIndex += stepDays
         }
     }
 }
+
 
 // One lane: events are placed with spacing based on date
 @Composable
@@ -156,8 +189,8 @@ private fun LaneRow(
             .horizontalScroll(scrollState)
             .padding(horizontal = 12.dp)
             .height(40.dp)
-            .widthIn(min = totalWidthDp),
-        verticalAlignment = Alignment.CenterVertically
+            .requiredWidth(totalWidthDp.coerceAtMost(12000.dp)),
+                verticalAlignment = Alignment.CenterVertically
     ) {
         var lastRightEdgeDays = 0
 
@@ -186,13 +219,14 @@ private fun LaneRow(
 private fun EventChip(
     event: Event, widthDp: Dp
 ) {
+    val chipWidth = if (widthDp < 12.dp) 12.dp else widthDp
     Surface(
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
         color = MaterialTheme.colorScheme.primaryContainer, // // higher contrast
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer, // // readable text
         modifier = Modifier
-            .width(widthDp)
+            .width(chipWidth)
             .height(36.dp)
             .clip(MaterialTheme.shapes.small)
     ) {
@@ -220,5 +254,20 @@ class TimelineViewModelFactory(
             return TimelineViewModel(dataset) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+@Composable
+private fun ZoomBar(value: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Scale")
+            Text("${value.toInt()} px/day")
+        }
+        // choose a sensible range for day width
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = 6f..80f   // zoom out … zoom in
+        )
     }
 }
