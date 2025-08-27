@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -150,7 +151,7 @@ private fun LaneRow(
             .fillMaxWidth()
             .horizontalScroll(scrollState)
             .padding(horizontal = 12.dp)
-            .height(IntrinsicSize.Min)
+            .height(40.dp)
             .widthIn(min = totalWidthDp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -179,11 +180,13 @@ private fun LaneRow(
 // Minimal visual for an event
 @Composable
 private fun EventChip(
-    event: Event, widthDp: androidx.compose.ui.unit.Dp
+    event: Event, widthDp: Dp
 ) {
     Surface(
-        tonalElevation = 2.dp,
-        shadowElevation = 1.dp,
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp,
+        color = MaterialTheme.colorScheme.primaryContainer, // // higher contrast
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer, // // readable text
         modifier = Modifier
             .width(widthDp)
             .height(36.dp)
@@ -192,8 +195,8 @@ private fun EventChip(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 8.dp), contentAlignment = Alignment.CenterStart
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
             Text(
                 text = event.name,
